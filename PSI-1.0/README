@@ -1,0 +1,68 @@
+Probe Selection for Imputation (PSI)
+------------------------------------
+
+For questions and comments, contact Yoni Donner <yonid@stanford.edu>.
+
+This tool implements the PSI approach described in the paper "Probe Selection for Imputation of Gene Expression Measurements". It allows selecting probes and training imputation models using a training set, and imputing full-expression profiles based on the selected probes.
+
+To use this tool, you need to have Python installed. Python can be downloaded from http://www.python.org.
+
+For all command-line options, see: psi.py -h
+
+File formats
+------------
+Gene expression files are tab-delimited, with the first row containing the column titles (experiment names), and the remaining rows containing expression data. The first column in every row is the probe name and the remaining columns are measured expression values, in log2-scale.
+
+Currently, input files should not contain missing values. While it is theoretically possible with some methods to learn models and impute even in the presence of missing values, this is not the focus of this work and the current version of this tool does not support learning or imputation with missing values (for imputation, this obviously applies only to selected probes). To use this tool with data which has some missing values, these values should be imputed using existing missing value imputation tools to generate input files with no missing values prior to running probe selection and imputation.
+
+Probe lists are text files with one probe name in every line. This format is used for selected probes and forced-inclusion probes.
+
+Imputation models begin with the method name (RGE, SR or LWA). All lines are tab-delimited. For LWA the second line contains the list of selected probes, the third contains the kernel width parameter, and the rest contain the training set expression levels (which are part of the imputation model), with the probe name followed by its expression values. For SR and RGE the second line contains column descriptions (names of corresponding selected probes), and the rest of the lines are imputation weights, where each line is tab-delimited and begins with the name of the target probe.
+
+Normally, you would only read and write imputation model files through this tool rather than manipulate them directly. The format is described here in case you want to do something with them outside this tool.
+
+Selection
+---------
+Prepare your training set in the gene expression format described above. Let's assume the name of this file is training.txt.
+
+To simply select probes, run:
+
+psi.py -s NUMBER-OF-PROBES -m METHOD-NAME training.txt selected_probes.txt
+
+This will use the specified method to select the specified number of probes, and save them to the specified output file (selected_probes.txt in this example).
+
+If you also want to save the imputation model to imputation_model.txt, add -o imputation_model.txt:
+
+psi.py -s NUMBER-OF-PROBES -m METHOD-NAME -o imputation_model.txt training.txt selected_probes.txt
+
+If you have a list of probes that you know in advance that you will want to measure, you can provide this list in the selection process to make these probes part of the learned imputation model, and to choose the remaining probes based on this list. If this list is saved (in the probe list file format described above) in forced_inclusion.txt, run:
+
+psi.py -s NUMBER-OF-PROBES -m METHOD-NAME -f forced_inclusion.txt -o imputation_model.txt training.txt selected_probes.txt
+
+Imputation
+----------
+To impute full expression profiles from gene expression data that contains the selected probes, run:
+
+psi.py -i imputation_model.txt measured_expression.txt full_expression.txt
+
+Replace imputation_model.txt with the name of the file in which you saved the imputation model, measured_expression.txt with the name of the file containing the measurements of the selected probes, and full_expression.txt with the name of the file in which you would like the imputed full expression profiles to be saved.
+
+Evaluation
+----------
+The next step after selection is to measure the selected probes in a large number of followup experiments, and proceed to imputation. However, if you have a validation set, you can first evaluate the learned imputation model. To do this, run the imputation as described above using the validation set as both input and as "ground truth" data, using the -g parameter:
+
+psi.py -i imputation_model.txt -g validation.txt validation.txt validation_imputation.txt
+
+This will read only the selected probes from validation.txt, generate imputations based on them and the imputation model saved in imputation_model.txt, and compute the ground-truth PCC (gtPCC) between the imputations and the ground-truth validation data. This value is the median Pearson correlation coefficient over all non-selected probes.
+
+If you want to simply extract the selected probes from a gene expression file, run:
+
+psi.py -e probes.txt full_expression.txt selected_expression.txt
+
+Replace probes.txt with the name of the file containing the selected probes, full_expression.txt with the name of the file containing all the probes (which must include the selected probes as a subset), and selected_expression.txt with the name of the file where output is to be saved.
+
+You can validate using the extracted probes:
+
+psi.py -i imputation_model.txt -g validation.txt selected_expression.txt validation_imputation.txt
+
+The result of this is the same as the above (using validation.txt as input).
